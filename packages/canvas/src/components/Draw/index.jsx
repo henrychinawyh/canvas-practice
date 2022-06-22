@@ -16,20 +16,24 @@ const TYPE = {
 
 const Draw = () => {
   const canvas = useRef();
-  const typeRef = useRef("");
-  const isDraw = useRef(false);
-  const color = useRef("#000000");
-  const [size, setSize] = useState([0, 0]);
+  const typeRef = useRef(""); // 画笔类型
+  const isDraw = useRef(false); // 是否可以开始画画
+  const color = useRef("#000000"); // 画笔颜色
+  const prePosition = useRef({ x: 0, y: 0 }); // 画笔按下时的位置
+  const imageData = useRef(); // 画布数据对象
+  const [size, setSize] = useState([0, 0]); // 存储画布宽度
 
   useEffect(() => {
     const ctx = canvas.current.getContext("2d");
     ctx.fillStyle = "#000000"; // 默认颜色
+    ctx.globalCompositeOperation = "destination-in";
     const canvasDiv = document.querySelector("#canvas");
     setSize([canvasDiv.offsetWidth, canvasDiv.offsetHeight]);
   }, []);
 
   //   修改颜色
   const changeColor = (e) => {
+    console.log(e.target.value);
     color.current = e.target.value;
   };
 
@@ -40,21 +44,28 @@ const Draw = () => {
   };
 
   //   鼠标按下
-  const mouseDown = () => {
+  const onMouseDown = (e) => {
     if (!typeRef.current) {
       message.error("请选择画笔类型");
     } else {
+      const x = e.pageX - 216;
+      const y = e.pageY - 136;
+      prePosition.current = { x, y }; // 设置画笔按下的位置
+
       isDraw.current = true;
     }
   };
 
   //   鼠标抬起
-  const mouseUp = () => {
+  const onMouseUp = () => {
+    const canvasRef = canvas.current;
+    const ctx = canvasRef.getContext("2d");
+    imageData.current = ctx.getImageData(0, 0, size[0], size[1]);
     isDraw.current = false;
   };
 
   //   鼠标移动
-  const mouseMove = (e) => {
+  const onMouseMove = (e) => {
     if (!isDraw.current) return;
     const canvasRef = canvas.current;
     const ctx = canvasRef.getContext("2d");
@@ -63,7 +74,13 @@ const Draw = () => {
 
     switch (typeRef.current) {
       case "huabi":
-        huabiFn(ctx, x, y);
+        huabiFn(ctx, prePosition.current.x, prePosition.current.y, x, y);
+        break;
+      case "juxing":
+        jxFn(ctx, prePosition.current.x, prePosition.current.y, x, y);
+        break;
+      case "yuanxing":
+        hyFn(ctx, prePosition.current.x, prePosition.current.y, x, y);
         break;
       default:
         break;
@@ -71,11 +88,45 @@ const Draw = () => {
   };
 
   //   画笔操作
-  const huabiFn = (ctx, x, y) => {
+  const huabiFn = (ctx, preX, preY, x, y) => {
     ctx.beginPath();
-    ctx.fillStyle = color.current;
-    ctx.arc(x, y, 3, 0, 2 * Math.PI);
-    ctx.fill();
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = color.current;
+    ctx.moveTo(preX, preY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.closePath();
+    prePosition.current = { x, y };
+  };
+
+  // 画矩形操作
+  const jxFn = (ctx, preX, preY, x = 0, y = 0) => {
+    ctx.clearRect(0, 0, size[0], size[1]);
+    ctx.beginPath();
+    imageData.current &&
+      ctx.putImageData(imageData.current, 0, 0, 0, 0, size[0], size[1]);
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = color.current;
+    ctx.strokeRect(preX, preY, Math.abs(preX - x), Math.abs(preY - y));
+    ctx.closePath();
+  };
+
+  // 画圆操作
+  const hyFn = (ctx, preX, preY, x = 0, y = 0) => {
+    ctx.clearRect(0, 0, size[0], size[1]);
+    ctx.beginPath();
+    imageData.current &&
+      ctx.putImageData(imageData.current, 0, 0, 0, 0, size[0], size[1]);
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = color.current;
+    ctx.arc(
+      preX,
+      preY,
+      Math.round(Math.sqrt(Math.abs(preX - x) ** 2 + Math.abs(preY - y) ** 2)),
+      0,
+      Math.PI * 2
+    );
+    ctx.stroke();
     ctx.closePath();
   };
 
@@ -84,6 +135,7 @@ const Draw = () => {
     const canvasRef = canvas.current;
     const ctx = canvasRef.getContext("2d");
     ctx.clearRect(0, 0, size[0], size[1]);
+    imageData.current = null;
   };
 
   // 保存操作
@@ -163,9 +215,9 @@ const Draw = () => {
         id="canvas"
       >
         <canvas
-          onMouseDown={mouseDown}
-          onMouseUp={mouseUp}
-          onMouseMove={mouseMove}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
           ref={canvas}
           width={size[0]}
           height={size[1]}
